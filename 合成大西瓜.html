@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>合成大西瓜</title>
+  <style>
+/* ── Reset & base ───────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #1a1a2e;
+  --panel:    #16213e;
+  --accent:   #e94560;
+  --accent2:  #0f3460;
+  --btn:      #0f3460;
+  --btn-h:    #1a4a80;
+  --btn-alt:  #2d6a4f;
+  --btn-alt-h:#3a8a63;
+  --btn-d:    #6b2737;
+  --btn-d-h:  #8b3349;
+  --text:     #eaeaea;
+  --muted:    #8899aa;
+  --border:   #2a3a5a;
+}
+
+html, body {
+  width: 100%; height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', Arial, sans-serif;
+  overflow-x: hidden;
+}
+
+/* ── Layout ─────────────────────────────────────────────── */
+#app {
+  display: flex;
+  flex-direction: row;
+  align-items: center;        /* vertically centre canvas + panel */
+  justify-content: center;
+  gap: 20px;
+  padding: 16px;
+  min-height: 100vh;
+}
+
+/* ── Game canvas wrapper ─────────────────────────────────── */
+#game-wrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#gameCanvas {
+  display: block;
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  cursor: crosshair;
+  /* width/height set dynamically by JS for responsiveness */
+  max-width: 100%;
+}
+
+/* ── Side panel ──────────────────────────────────────────── */
+#ui-panel {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.game-title {
+  font-size: 1.6rem;
+  font-weight: 900;
+  line-height: 1.15;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(233,69,96,0.5);
+}
+
+/* ── Score row ───────────────────────────────────────────── */
+.score-row {
+  display: flex;
+  gap: 8px;
+}
+.score-box {
+  flex: 1;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 6px 6px;
+  text-align: center;
+}
+.score-label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+#score-val, #best-val {
+  display: block;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #fff;
+  min-height: 1.6em;
+  word-break: break-all;
+}
+
+/* ── Next fruit ──────────────────────────────────────────── */
+.next-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+#nextCanvas {
+  border-radius: 50%;
+  background: transparent;
+}
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.btn-group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.btn {
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 7px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  background: var(--btn);
+  color: #fff;
+}
+.btn:hover  { background: var(--btn-h); }
+.btn:active { transform: scale(0.97); }
+
+.btn-alt        { background: var(--btn-alt); }
+.btn-alt:hover  { background: var(--btn-alt-h); }
+
+.btn-danger       { background: var(--btn-d); }
+.btn-danger:hover { background: var(--btn-d-h); }
+
+/* ── Hints ───────────────────────────────────────────────── */
+.hints {
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.8;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+/* ── Sprite editor ───────────────────────────────────────── */
+#sprite-editor {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 10px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+#sprite-editor.hidden { display: none; }
+
+.editor-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.editor-hint {
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+/* Sprite row */
+.sprite-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+}
+.sprite-row:last-child { border-bottom: none; }
+
+.sprite-thumb {
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #2a3a5a;
+}
+.sprite-name {
+  flex: 1;
+  font-size: 0.72rem;
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.btn-small {
+  padding: 3px 7px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 5px;
+  background: var(--accent2);
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.btn-small:hover { background: #1a5a90; }
+
+.fit-select {
+  font-size: 0.65rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* ── Game-over overlay ───────────────────────────────────── */
+#over-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+#over-overlay.hidden { display: none; }
+
+#over-card {
+  background: var(--panel);
+  border: 2px solid var(--accent);
+  border-radius: 16px;
+  padding: 36px 48px;
+  text-align: center;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.6);
+}
+#over-card h2 {
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+#over-score, #over-best {
+  font-size: 1.15rem;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+#btn-again {
+  margin-top: 20px;
+  width: 160px;
+  padding: 12px;
+  font-size: 1rem;
+}
+
+/* ── Scrollbar styling ───────────────────────────────────── */
+#sprite-editor::-webkit-scrollbar { width: 5px; }
+#sprite-editor::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+/* ── Responsive ──────────────────────────────────────────── */
+/* Stack vertically when viewport is narrower than canvas+panel+gaps (~780 px) */
+@media (max-width: 780px) {
+  #app {
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+    gap: 12px;
+  }
+  #ui-panel {
+    width: 100%;
+    max-width: 520px;
+  }
+  .btn-group {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .btn { flex: 1 1 45%; }
+  .hints { display: none; }   /* hide hints on mobile to save space */
+}
+
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ── Game canvas ── -->
+  <div id="game-wrap">
+    <canvas id="gameCanvas" width="520" height="750"></canvas>
+  </div>
+
+  <!-- ── Side panel ── -->
+  <aside id="ui-panel">
+
+    <h1 class="game-title">🍉 合成<br>大西瓜</h1>
+
+    <!-- Scores -->
+    <div class="score-row">
+      <div class="score-box">
+        <span class="score-label">分数</span>
+        <span id="score-val">0</span>
+      </div>
+      <div class="score-box">
+        <span class="score-label">最高</span>
+        <span id="best-val">0</span>
+      </div>
+    </div>
+
+    <!-- Next fruit -->
+    <div class="next-box">
+      <span class="score-label">下一个</span>
+      <canvas id="nextCanvas" width="80" height="80"></canvas>
+    </div>
+
+    <!-- Buttons -->
+    <div class="btn-group">
+      <button id="btn-pause"   class="btn">⏸ 暂停</button>
+      <button id="btn-restart" class="btn">🔄 重新开始</button>
+      <button id="btn-editor"  class="btn btn-alt">🎨 皮肤</button>
+      <button id="btn-clear"   class="btn btn-danger">🗑 清除自定义</button>
+    </div>
+
+    <!-- Controls hint -->
+    <div class="hints">
+      <p>🖱 鼠标/触摸瞄准</p>
+      <p>点击/触摸投放</p>
+      <p>← → 或 A D 移动</p>
+      <p>空格/回车投放</p>
+      <p>P 暂停</p>
+    </div>
+
+    <!-- ── Sprite editor (toggle) ── -->
+    <div id="sprite-editor" class="hidden">
+      <h3 class="editor-title">皮肤编辑器</h3>
+      <p class="editor-hint">为每种水果上传PNG/JPG图片。<br>刷新后设置保留。</p>
+      <div id="sprite-list"></div>
+    </div>
+
+  </aside>
+</div><!-- #app -->
+
+<!-- ── Game-over overlay ── -->
+<div id="over-overlay" class="hidden">
+  <div id="over-card">
+    <h2>游戏结束</h2>
+    <p id="over-score">分数：0</p>
+    <p id="over-best">最高：0</p>
+    <button id="btn-again" class="btn">▶ 再玩一次</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════════
+//  FRUIT CONFIGURATION
+//  Edit this array to add/remove/rename fruit levels.
+//  radius      – circle radius in canvas pixels
+//  scoreValue  – points awarded when two fruits merge INTO this level
+//  color       – fallback fill when no image is loaded
+//  imageSrc    – default asset path (optional; missing files are safe)
+// ═══════════════════════════════════════════════════════════════
+const FRUITS = [
+  { name:'樱桃',     radius: 22,  scoreValue:  1, color:'#C0392B', imageSrc:'assets/fruit_0.png' },
+  { name:'草莓', radius: 30,  scoreValue:  3, color:'#E74C3C', imageSrc:'assets/fruit_1.png' },
+  { name:'葡萄',      radius: 38,  scoreValue:  6, color:'#8E44AD', imageSrc:'assets/fruit_2.png' },
+  { name:'椪柑',    radius: 48,  scoreValue: 10, color:'#E67E22', imageSrc:'assets/fruit_3.png' },
+  { name:'柿子',  radius: 58,  scoreValue: 15, color:'#D35400', imageSrc:'assets/fruit_4.png' },
+  { name:'苹果',      radius: 68,  scoreValue: 21, color:'#27AE60', imageSrc:'assets/fruit_5.png' },
+  { name:'梨',       radius: 80,  scoreValue: 28, color:'#F1C40F', imageSrc:'assets/fruit_6.png' },
+  { name:'桃子',      radius: 92,  scoreValue: 36, color:'#FADADD', imageSrc:'assets/fruit_7.png' },
+  { name:'菠萝',  radius:106,  scoreValue: 45, color:'#F39C12', imageSrc:'assets/fruit_8.png' },
+  { name:'甜瓜',      radius:120,  scoreValue: 55, color:'#2ECC71', imageSrc:'assets/fruit_9.png' },
+  { name:'西瓜', radius:136,  scoreValue: 66, color:'#1E8449', imageSrc:'assets/fruit_10.png'},
+  { name:'银河',     radius:160,  scoreValue: 78, color:'#1A2980', imageSrc:'assets/fruit_11.png'},
+];
+
+// ═══════════════════════════════════════════════════════════════
+//  PHYSICS / GAME CONSTANTS  (tweak here for feel)
+// ═══════════════════════════════════════════════════════════════
+const CW           = 520;    // canvas width  (px)  ← was 400
+const CH           = 750;    // canvas height (px)  ← was 580
+const WALL_L       = 10;     // left  wall x
+const WALL_R       = 510;    // right wall x  (= CW - WALL_L)
+const FLOOR_Y      = 740;    // floor y       (= CH - 10)
+const LOSE_Y       = 110;    // danger line y – stacking above this triggers timer
+const DROP_Y       = 55;     // y-centre of held fruit
+
+const GRAVITY      = 2200;   // px / s²
+const RESTITUTION  = 0.45;   // bounciness  ← was 0.10; bouncier feel
+const LIN_DAMP     = 0.978;  // per-frame linear velocity multiplier ← was 0.965
+const FLOOR_FRIC   = 0.92;   // x-damping when touching floor ← was 0.88
+const SOLVER_ITER  = 10;     // collision-solver iterations per frame ← was 8
+const POS_CORR     = 0.55;   // Baumgarte position-correction factor
+const SLOP         = 0.4;    // penetration slop (px)
+const MAX_VEL      = 2800;   // velocity cap (px/s) ← was 2400
+
+const MERGE_IMMUNE = 0.35;   // seconds a new/merged fruit cannot merge
+const DROP_COOL_S  = 0.55;   // seconds of cooldown between drops
+const DANGER_SEC   = 2.0;    // seconds above lose-line before game over
+const SPAWN_LEVELS = 5;      // only spawn fruit indices 0 … SPAWN_LEVELS-1
+
+// Global fruit-radius scale factor – shrinks all radii for more play space
+const FRUIT_SCALE  = 0.88;
+// Helper: scaled radius for fruit level (use everywhere instead of FRUITS[n].radius)
+const R = level => Math.round(FRUITS[level].radius * FRUIT_SCALE);
+// Fruit mass density: mass = radius² × MASS_DENSITY
+// Larger fruits are proportionally heavier, giving realistic collision response.
+const MASS_DENSITY = 1.5;
+
+// ═══════════════════════════════════════════════════════════════
+//  FRUIT  – physics body + game data
+// ═══════════════════════════════════════════════════════════════
+let _nextId = 0;
+
+class Fruit {
+  constructor(level, x, y) {
+    this.id            = _nextId++;
+    this.level         = level;
+    this.radius        = R(level);
+    this.x             = x;
+    this.y             = y;
+    this.vx            = 0;
+    this.vy            = 0;
+    this.mass          = this.radius * this.radius * MASS_DENSITY;
+    this.age           = 0;            // seconds since added to world
+    this.pendingRemove = false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MERGE EFFECT  – burst of particles + floating score text
+// ═══════════════════════════════════════════════════════════════
+class MergeEffect {
+  constructor(x, y, score, color) {
+    this.x     = x;
+    this.y     = y;
+    this.score = score;
+    this.color = color;
+    this.life  = 1.0;          // 1→0
+
+    const N = 8 + (score | 0) % 6;
+    this.parts = Array.from({ length: N }, (_, i) => {
+      const a = (i / N) * Math.PI * 2 + Math.random() * 0.4;
+      const s = 60 + Math.random() * 130;
+      return { x, y, vx: Math.cos(a)*s, vy: Math.sin(a)*s, r: 3 + Math.random()*4 };
+    });
+  }
+
+  update(dt) {
+    this.life -= dt * 1.6;
+    for (const p of this.parts) {
+      p.x  += p.vx * dt;
+      p.y  += p.vy * dt;
+      p.vy += 400 * dt;   // particle gravity
+    }
+  }
+
+  isDead() { return this.life <= 0; }
+
+  draw(ctx) {
+    ctx.save();
+    for (const p of this.parts) {
+      ctx.globalAlpha = Math.max(0, this.life);
+      ctx.fillStyle   = this.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+      ctx.fill();
+    }
+    // Floating score text (fades in first half, fades out in second)
+    const ta = Math.min(1, this.life * 2.5);
+    if (ta > 0) {
+      ctx.globalAlpha = ta;
+      ctx.fillStyle   = '#ffffff';
+      ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+      ctx.lineWidth   = 3;
+      ctx.font        = `bold 18px Arial`;
+      ctx.textAlign   = 'center';
+      ctx.textBaseline= 'middle';
+      const rise = (1 - this.life) * 28;
+      ctx.strokeText(`+${this.score}`, this.x, this.y - rise);
+      ctx.fillText  (`+${this.score}`, this.x, this.y - rise);
+    }
+    ctx.restore();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PHYSICS WORLD
+// ═══════════════════════════════════════════════════════════════
+class PhysicsWorld {
+  constructor() {
+    this.fruits      = [];
+    this._mergeSet   = new Set();   // dedup key → prevents double-merge
+    this._mergeQueue = [];
+  }
+
+  add(fruit) { this.fruits.push(fruit); }
+
+  // Returns array of { fruit, score, x, y, level } for each merge that happened
+  update(dt) {
+    const live = this.fruits.filter(f => !f.pendingRemove);
+
+    // ── 1. Integrate ──────────────────────────────────────────
+    for (const f of live) {
+      f.age += dt;
+      f.vy  += GRAVITY * dt;
+      f.x   += f.vx * dt;
+      f.y   += f.vy * dt;
+
+      f.vx *= LIN_DAMP;
+      f.vy *= LIN_DAMP;
+
+      // velocity cap
+      const spd = Math.hypot(f.vx, f.vy);
+      if (spd > MAX_VEL) { f.vx *= MAX_VEL/spd; f.vy *= MAX_VEL/spd; }
+    }
+
+    // ── 2. Solver iterations ──────────────────────────────────
+    for (let iter = 0; iter < SOLVER_ITER; iter++) {
+
+      // Walls & floor
+      for (const f of live) {
+        if (f.pendingRemove) continue;
+
+        if (f.x - f.radius < WALL_L) {
+          f.x = WALL_L + f.radius;
+          if (f.vx < 0) f.vx *= -RESTITUTION;
+        }
+        if (f.x + f.radius > WALL_R) {
+          f.x = WALL_R - f.radius;
+          if (f.vx > 0) f.vx *= -RESTITUTION;
+        }
+        if (f.y + f.radius > FLOOR_Y) {
+          f.y = FLOOR_Y - f.radius;
+          if (f.vy > 0) { f.vy *= -RESTITUTION; f.vx *= FLOOR_FRIC; }
+        }
+        // Safety: prevent going above canvas
+        if (f.y - f.radius < 0) {
+          f.y = f.radius;
+          if (f.vy < 0) f.vy *= -RESTITUTION;
+        }
+      }
+
+      // Circle–circle
+      for (let i = 0; i < live.length; i++) {
+        const a = live[i];
+        if (a.pendingRemove) continue;
+
+        for (let j = i + 1; j < live.length; j++) {
+          const b = live[j];
+          if (b.pendingRemove) continue;
+
+          const dx   = b.x - a.x;
+          const dy   = b.y - a.y;
+          const dSq  = dx*dx + dy*dy;
+          const minD = a.radius + b.radius;
+          if (dSq >= minD * minD) continue;
+
+          const dist = Math.sqrt(dSq) || 0.0001;
+          const nx   = dx / dist;
+          const ny   = dy / dist;
+
+          // ── Merge check ─────────────────────────────────────
+          if (a.level === b.level &&
+              a.level < FRUITS.length - 1 &&
+              a.age   > MERGE_IMMUNE &&
+              b.age   > MERGE_IMMUNE) {
+            const key = a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`;
+            if (!this._mergeSet.has(key)) {
+              this._mergeSet.add(key);
+              this._mergeQueue.push({ a, b });
+              a.pendingRemove = true;
+              b.pendingRemove = true;
+            }
+            continue;
+          }
+
+          // ── Positional correction ────────────────────────────
+          const overlap = minD - dist;
+          const corr    = Math.max(overlap - SLOP, 0) * POS_CORR * 0.5;
+          a.x -= nx * corr;   a.y -= ny * corr;
+          b.x += nx * corr;   b.y += ny * corr;
+
+          // ── Velocity impulse ─────────────────────────────────
+          const relDot = (b.vx - a.vx)*nx + (b.vy - a.vy)*ny;
+          if (relDot < 0) {
+            const invMassSum = 1/a.mass + 1/b.mass;
+            const imp = -(1 + RESTITUTION) * relDot / invMassSum;
+            a.vx -= (imp / a.mass) * nx;  a.vy -= (imp / a.mass) * ny;
+            b.vx += (imp / b.mass) * nx;  b.vy += (imp / b.mass) * ny;
+          }
+        }
+      }
+    }
+
+    // ── 3. Process merge queue ────────────────────────────────
+    const results = [];
+    for (const { a, b } of this._mergeQueue) {
+      const lvl = a.level + 1;
+      const mx  = (a.x + b.x) * 0.5;
+      const my  = (a.y + b.y) * 0.5;
+      const nf  = new Fruit(lvl, mx, my);
+      nf.vx = (a.vx + b.vx) * 0.3;   // dampened combined momentum
+      nf.vy = (a.vy + b.vy) * 0.3;
+      this.fruits.push(nf);
+      results.push({ fruit: nf, score: FRUITS[lvl].scoreValue, x: mx, y: my, level: lvl });
+    }
+    this._mergeQueue = [];
+    this._mergeSet.clear();
+    this.fruits = this.fruits.filter(f => !f.pendingRemove);
+
+    return results;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SPRITE MANAGER  – loads images, draws fruit circles
+// ═══════════════════════════════════════════════════════════════
+class SpriteManager {
+  constructor() {
+    this.images   = new Array(FRUITS.length).fill(null);
+    this.fitModes = new Array(FRUITS.length).fill('cover'); // default: square-crop to fill
+    this._loadFromStorage();
+    this._loadDefaultAssets();
+  }
+
+  _loadFromStorage() {
+    for (let i = 0; i < FRUITS.length; i++) {
+      const url = localStorage.getItem(`suika_sprite_${i}`);
+      const fit = localStorage.getItem(`suika_fit_${i}`);
+      if (fit) this.fitModes[i] = fit;
+      if (url) {
+        const img = new Image();
+        img.src = url;
+        this.images[i] = img;
+      }
+    }
+  }
+
+  _loadDefaultAssets() {
+    for (let i = 0; i < FRUITS.length; i++) {
+      if (this.images[i]) continue;    // already set by localStorage
+      const img = new Image();
+      img.onload  = () => { this.images[i] = img; };
+      img.onerror = () => { /* no asset file – silent fallback to color */ };
+      img.src = FRUITS[i].imageSrc;
+    }
+  }
+
+  setCustom(level, dataURL, fitMode = 'cover') {
+    const img = new Image();
+    img.onload = () => { this.images[level] = img; };
+    img.src = dataURL;
+    this.fitModes[level] = fitMode;
+    localStorage.setItem(`suika_sprite_${level}`, dataURL);
+    localStorage.setItem(`suika_fit_${level}`,    fitMode);
+  }
+
+  setFitMode(level, mode) {
+    this.fitModes[level] = mode;
+    localStorage.setItem(`suika_fit_${level}`, mode);
+  }
+
+  clearAll() {
+    for (let i = 0; i < FRUITS.length; i++) {
+      localStorage.removeItem(`suika_sprite_${i}`);
+      localStorage.removeItem(`suika_fit_${i}`);
+      this.images[i]   = null;
+      this.fitModes[i] = 'contain';
+    }
+    this._loadDefaultAssets();
+  }
+
+  // Draw one fruit circle onto any ctx at (x, y) with given radius
+  drawFruit(ctx, level, x, y, radius, alpha = 1) {
+    const img  = this.images[level];
+    const info = FRUITS[level];
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI*2);
+
+    if (img && img.complete && img.naturalWidth > 0) {
+      ctx.save();
+      ctx.clip();
+
+      if (this.fitModes[level] === 'cover') {
+        // True center-square crop → fills circle with no letterboxing.
+        // Compute the largest centered square inside the source image:
+        //   if imgW > imgH: sx=(imgW-imgH)/2, sy=0, s=imgH
+        //   else:           sx=0, sy=(imgH-imgW)/2, s=imgW
+        const iw = img.naturalWidth, ih = img.naturalHeight;
+        const sq = Math.min(iw, ih);
+        const sx = (iw - sq) / 2;
+        const sy = (ih - sq) / 2;
+        const d  = radius * 2;
+        // 9-arg drawImage: src crop → dest rect (circle clip already active)
+        ctx.drawImage(img, sx, sy, sq, sq, x - radius, y - radius, d, d);
+      } else {
+        // Contain – fit image inside circle, letterbox with color background
+        const s = Math.min(radius*2 / img.naturalWidth, radius*2 / img.naturalHeight);
+        const w = img.naturalWidth  * s;
+        const h = img.naturalHeight * s;
+        ctx.fillStyle = info.color + '44';
+        ctx.fill();
+        ctx.drawImage(img, x - w*0.5, y - h*0.5, w, h);
+      }
+      ctx.restore();
+    } else {
+      // Color fallback
+      ctx.fillStyle = info.color;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+      ctx.lineWidth   = 2;
+      ctx.stroke();
+
+      // Label text
+      const fs = Math.max(9, radius * 0.38);
+      ctx.fillStyle    = radius < 35 ? '#fff' : '#fff';
+      ctx.font         = `bold ${fs}px Arial`;
+      ctx.textAlign    = 'center';
+      ctx.textBaseline = 'middle';
+      // Show short name (up to 5 chars)
+      ctx.fillText(info.name.slice(0, 5), x, y);
+    }
+
+    ctx.restore();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RENDERER  – all canvas drawing
+// ═══════════════════════════════════════════════════════════════
+class Renderer {
+  constructor(ctx, sprites) {
+    this.ctx     = ctx;
+    this.sprites = sprites;
+  }
+
+  draw({ fruits, held, particles, dangerTimer, paused }) {
+    const ctx = this.ctx;
+    ctx.clearRect(0, 0, CW, CH);
+
+    // ── Background ───────────────────────────────────────────
+    ctx.fillStyle = '#FEF5E7';
+    ctx.fillRect(0, 0, CW, CH);
+
+    // ── Drop-zone tint (above lose line) ─────────────────────
+    ctx.fillStyle = 'rgba(200,100,100,0.06)';
+    ctx.fillRect(WALL_L, 0, WALL_R - WALL_L, LOSE_Y);
+
+    // ── Walls & floor ────────────────────────────────────────
+    ctx.fillStyle = '#C8A97E';
+    ctx.fillRect(0,      0,       WALL_L,        CH);             // left
+    ctx.fillRect(WALL_R, 0,       CW - WALL_R,   CH);             // right
+    ctx.fillRect(0,      FLOOR_Y, CW,             CH - FLOOR_Y);  // floor
+
+    // Subtle inner border
+    ctx.strokeStyle = '#B08A5E';
+    ctx.lineWidth   = 1.5;
+    ctx.strokeRect(WALL_L, 0, WALL_R - WALL_L, FLOOR_Y);
+
+    // ── Lose line ────────────────────────────────────────────
+    const pulse     = dangerTimer > 0 ? 0.5 + 0.4 * Math.sin(Date.now() / 160) : 1;
+    const lineAlpha = dangerTimer > 0 ? pulse : 0.38;
+    ctx.strokeStyle = dangerTimer > 0
+      ? `rgba(220,40,40,${lineAlpha})`
+      : `rgba(180,60,60,${lineAlpha})`;
+    ctx.lineWidth   = dangerTimer > 0 ? 2.5 : 1.5;
+    ctx.setLineDash([9, 6]);
+    ctx.beginPath();
+    ctx.moveTo(WALL_L, LOSE_Y);
+    ctx.lineTo(WALL_R, LOSE_Y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Danger warning text
+    if (dangerTimer > 0.4) {
+      const a = Math.min(0.9, dangerTimer * 0.55);
+      ctx.fillStyle = `rgba(220,40,40,${a})`;
+      ctx.font      = 'bold 12px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText('⚠ TOO HIGH', CW/2, LOSE_Y - 5);
+      // progress bar for danger timer
+      const pct = Math.min(1, dangerTimer / DANGER_SEC);
+      ctx.fillStyle = `rgba(220,40,40,${a * 0.7})`;
+      ctx.fillRect(WALL_L, LOSE_Y + 1, (WALL_R - WALL_L) * pct, 3);
+    }
+
+    // ── Aim guide ────────────────────────────────────────────
+    if (held) {
+      const r = R(held.level);
+      ctx.strokeStyle = 'rgba(0,0,0,0.10)';
+      ctx.lineWidth   = 1;
+      ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.moveTo(held.x, DROP_Y + r);
+      ctx.lineTo(held.x, FLOOR_Y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // ── Settled fruits ───────────────────────────────────────
+    for (const f of fruits) {
+      this.sprites.drawFruit(ctx, f.level, f.x, f.y, f.radius);
+    }
+
+    // ── Held fruit ───────────────────────────────────────────
+    if (held) {
+      this.sprites.drawFruit(ctx, held.level, held.x, DROP_Y, R(held.level), 0.82);
+    }
+
+    // ── Merge particles ──────────────────────────────────────
+    for (const p of particles) p.draw(ctx);
+
+    // ── Pause overlay ────────────────────────────────────────
+    if (paused) {
+      ctx.fillStyle = 'rgba(10,10,30,0.52)';
+      ctx.fillRect(0, 0, CW, CH);
+      ctx.fillStyle    = '#fff';
+      ctx.font         = 'bold 40px Arial';
+      ctx.textAlign    = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('PAUSED', CW/2, CH/2);
+      ctx.font      = '18px Arial';
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillText('Press P or click Pause to resume', CW/2, CH/2 + 44);
+    }
+  }
+
+  drawNextPreview(ctx2, level) {
+    ctx2.clearRect(0, 0, 80, 80);
+    const r = Math.min(R(level), 34);
+    this.sprites.drawFruit(ctx2, level, 40, 40, r);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SPRITE EDITOR
+// ═══════════════════════════════════════════════════════════════
+class SpriteEditor {
+  constructor(sprites) {
+    this.sprites = sprites;
+    this.panel   = document.getElementById('sprite-editor');
+    this._build();
+  }
+
+  toggle() {
+    const hidden = this.panel.classList.toggle('hidden');
+    if (!hidden) this._refreshThumbs();
+  }
+
+  _build() {
+    const list = document.getElementById('sprite-list');
+    list.innerHTML = '';
+    for (let i = 0; i < FRUITS.length; i++) {
+      const row = document.createElement('div');
+      row.className = 'sprite-row';
+
+      // Thumbnail
+      const cv = document.createElement('canvas');
+      cv.width = 44; cv.height = 44;
+      cv.className = 'sprite-thumb';
+      cv.dataset.level = i;
+
+      // Name label
+      const nm = document.createElement('span');
+      nm.className   = 'sprite-name';
+      nm.textContent = FRUITS[i].name;
+
+      // Hidden file input
+      const fi = document.createElement('input');
+      fi.type   = 'file';
+      fi.accept = 'image/*';
+      fi.style.display = 'none';
+      fi.addEventListener('change', e => this._onFile(e, i));
+
+      // Upload button
+      const ub = document.createElement('button');
+      ub.textContent = '📁';
+      ub.className   = 'btn-small';
+      ub.title       = 'Upload image';
+      ub.addEventListener('click', () => fi.click());
+
+      // Fit-mode select
+      const sel = document.createElement('select');
+      sel.className = 'fit-select';
+      ['contain', 'cover'].forEach(m => {
+        const o = document.createElement('option');
+        o.value = m; o.textContent = m;
+        if (this.sprites.fitModes[i] === m) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.addEventListener('change', e => {
+        this.sprites.setFitMode(i, e.target.value);
+        this._refreshThumb(i);
+      });
+
+      row.append(cv, nm, ub, sel, fi);
+      list.appendChild(row);
+    }
+    this._refreshThumbs();
+  }
+
+  _onFile(e, level) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const sel = document.querySelector(
+        `#sprite-list .sprite-row:nth-child(${level+1}) .fit-select`
+      );
+      const mode = sel ? sel.value : 'cover';
+      this.sprites.setCustom(level, ev.target.result, mode);
+      // Slight delay to let image load
+      setTimeout(() => this._refreshThumb(level), 120);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  _refreshThumb(level) {
+    const cv = document.querySelector(`canvas.sprite-thumb[data-level="${level}"]`);
+    if (!cv) return;
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, 44, 44);
+    this.sprites.drawFruit(ctx, level, 22, 22, 20);
+  }
+
+  _refreshThumbs() {
+    for (let i = 0; i < FRUITS.length; i++) this._refreshThumb(i);
+  }
+
+  rebuild() { this._build(); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  GAME  – main controller
+// ═══════════════════════════════════════════════════════════════
+class Game {
+  constructor() {
+    this.canvas     = document.getElementById('gameCanvas');
+    this.ctx        = this.canvas.getContext('2d');
+    this.nextCanvas = document.getElementById('nextCanvas');
+    this.nextCtx    = this.nextCanvas.getContext('2d');
+
+    this.physics    = new PhysicsWorld();
+    this.sprites    = new SpriteManager();
+    this.renderer   = new Renderer(this.ctx, this.sprites);
+
+    this.score      = 0;
+    this.bestScore  = parseInt(localStorage.getItem('suika_best') || '0', 10);
+    this.gameOver   = false;
+    this.paused     = false;
+
+    // Drop state: 'holding' | 'cooldown'
+    this._state     = 'holding';
+    this._cooldown  = 0;
+
+    this.heldFruit  = null;
+    this.nextLevel  = this._rnd();
+    this.dropX      = CW / 2;
+
+    this.dangerTimer = 0;
+    this.particles   = [];
+
+    this._lastTs     = null;
+    this._rafId      = null;
+
+    this._initHeld();
+    this._setupInput();
+  }
+
+  _rnd() { return Math.floor(Math.random() * SPAWN_LEVELS); }
+
+  _initHeld() {
+    this.heldFruit = { level: this.nextLevel, x: this.dropX };
+    this.nextLevel = this._rnd();
+    this._updateUI();
+  }
+
+  // ── Input ────────────────────────────────────────────────────
+  _setupInput() {
+    const cv = this.canvas;
+
+    // Mouse
+    cv.addEventListener('mousemove', e => {
+      const r    = cv.getBoundingClientRect();
+      this.dropX = (e.clientX - r.left) * (CW / r.width);
+    });
+    cv.addEventListener('click', () => this.drop());
+
+    // Touch
+    const toGame = touch => {
+      const r = cv.getBoundingClientRect();
+      return (touch.clientX - r.left) * (CW / r.width);
+    };
+    cv.addEventListener('touchstart',  e => { e.preventDefault(); this.dropX = toGame(e.touches[0]); }, { passive: false });
+    cv.addEventListener('touchmove',   e => { e.preventDefault(); this.dropX = toGame(e.touches[0]); }, { passive: false });
+    cv.addEventListener('touchend',    e => { e.preventDefault(); this.drop(); }, { passive: false });
+
+    // Keyboard
+    let leftHeld = false, rightHeld = false;
+    let moveRafId = null, movePrev = null;  // movePrev hoisted outside moveTick
+    const MOVE_SPD = 240; // px/s
+
+    const moveTick = ts => {
+      const dt = movePrev === null ? 0 : (ts - movePrev) / 1000;
+      movePrev = ts;
+      if (leftHeld)  this.dropX -= MOVE_SPD * dt;
+      if (rightHeld) this.dropX += MOVE_SPD * dt;
+      this.dropX = Math.max(WALL_L, Math.min(WALL_R, this.dropX));
+      if (leftHeld || rightHeld) { moveRafId = requestAnimationFrame(moveTick); }
+      else { moveRafId = null; movePrev = null; }
+    };
+
+    document.addEventListener('keydown', e => {
+      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); this.drop(); return; }
+      if (e.key === 'p' || e.key === 'P')     { this.togglePause(); return; }
+      if ((e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') && !leftHeld)  {
+        leftHeld = true;
+        if (!moveRafId) { movePrev = null; moveRafId = requestAnimationFrame(moveTick); }
+      }
+      if ((e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') && !rightHeld) {
+        rightHeld = true;
+        if (!moveRafId) { movePrev = null; moveRafId = requestAnimationFrame(moveTick); }
+      }
+    });
+    document.addEventListener('keyup', e => {
+      if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') leftHeld  = false;
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') rightHeld = false;
+    });
+  }
+
+  // ── Public actions ──────────────────────────────────────────
+  drop() {
+    if (this._state !== 'holding' || this.gameOver || this.paused || !this.heldFruit) return;
+
+    const lvl = this.heldFruit.level;
+    const r   = R(lvl);
+    const x   = Math.max(WALL_L + r + 1, Math.min(WALL_R - r - 1, this.dropX));
+
+    const f  = new Fruit(lvl, x, DROP_Y);
+    f.vy     = 100;
+    this.physics.add(f);
+
+    this.heldFruit  = null;
+    this._state     = 'cooldown';
+    this._cooldown  = DROP_COOL_S;
+  }
+
+  togglePause() {
+    if (this.gameOver) return;
+    this.paused = !this.paused;
+    document.getElementById('btn-pause').textContent = this.paused ? '▶ Resume' : '⏸ 暂停';
+  }
+
+  restart() {
+    this.physics     = new PhysicsWorld();
+    this.score       = 0;
+    this.gameOver    = false;
+    this.paused      = false;
+    this.dangerTimer = 0;
+    this.particles   = [];
+    this.heldFruit   = null;
+    this.nextLevel   = this._rnd();
+    this.dropX       = CW / 2;
+    this._state      = 'holding';
+    this._cooldown   = 0;
+    this._lastTs     = null;
+
+    document.getElementById('over-overlay').classList.add('hidden');
+    document.getElementById('btn-pause').textContent = '⏸ 暂停';
+
+    this._initHeld();
+  }
+
+  // ── Main loop ────────────────────────────────────────────────
+  _loop(ts) {
+    if (this._lastTs === null) this._lastTs = ts;
+    const dt = Math.min((ts - this._lastTs) / 1000, 0.05);
+    this._lastTs = ts;
+
+    this._update(dt);
+    this._render();
+
+    this._rafId = requestAnimationFrame(t => this._loop(t));
+  }
+
+  start() {
+    if (this._rafId) cancelAnimationFrame(this._rafId);
+    this._rafId = requestAnimationFrame(t => this._loop(t));
+  }
+
+  // ── Update ───────────────────────────────────────────────────
+  _update(dt) {
+    if (this.paused || this.gameOver) return;
+
+    // Cooldown → spawn next held fruit
+    if (this._state === 'cooldown') {
+      this._cooldown -= dt;
+      if (this._cooldown <= 0) {
+        this._state = 'holding';
+        this._initHeld();
+      }
+    }
+
+    // Clamp held fruit x
+    if (this.heldFruit) {
+      const r = R(this.heldFruit.level);
+      this.heldFruit.x = Math.max(WALL_L + r + 1, Math.min(WALL_R - r - 1, this.dropX));
+    }
+
+    // Physics step
+    const merges = this.physics.update(dt);
+
+    // Handle merges
+    for (const m of merges) {
+      this.score += m.score;
+      this.particles.push(new MergeEffect(m.x, m.y, m.score, FRUITS[m.level].color));
+    }
+    if (merges.length) {
+      if (this.score > this.bestScore) {
+        this.bestScore = this.score;
+        localStorage.setItem('suika_best', this.bestScore);
+      }
+      this._updateUI();
+    }
+
+    // Update particles
+    for (const p of this.particles) p.update(dt);
+    this.particles = this.particles.filter(p => !p.isDead());
+
+    // ── Lose check ───────────────────────────────────────────
+    // Any settled fruit whose top edge is above the lose line?
+    const inDanger = this.physics.fruits.some(f => f.age > 0.6 && f.y - f.radius < LOSE_Y);
+    if (inDanger) {
+      this.dangerTimer += dt;
+      if (this.dangerTimer >= DANGER_SEC) { this._gameOver(); return; }
+    } else {
+      this.dangerTimer = Math.max(0, this.dangerTimer - dt * 0.8);
+    }
+  }
+
+  _gameOver() {
+    this.gameOver = true;
+    if (this.score > this.bestScore) {
+      this.bestScore = this.score;
+      localStorage.setItem('suika_best', this.bestScore);
+    }
+    document.getElementById('over-score').textContent = `Score: ${this.score}`;
+    document.getElementById('over-best' ).textContent = `Best:  ${this.bestScore}`;
+    document.getElementById('over-overlay').classList.remove('hidden');
+  }
+
+  _updateUI() {
+    document.getElementById('score-val').textContent = this.score;
+    document.getElementById('best-val' ).textContent = this.bestScore;
+    this.renderer.drawNextPreview(this.nextCtx, this.nextLevel);
+  }
+
+  // ── Render ───────────────────────────────────────────────────
+  _render() {
+    this.renderer.draw({
+      fruits:      this.physics.fruits,
+      held:        this.heldFruit,
+      particles:   this.particles,
+      dangerTimer: this.dangerTimer,
+      paused:      this.paused,
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BOOTSTRAP
+// ═══════════════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  const game   = new Game();
+  const editor = new SpriteEditor(game.sprites);
+
+  // Buttons
+  document.getElementById('btn-restart').addEventListener('click', () => game.restart());
+  document.getElementById('btn-pause'  ).addEventListener('click', () => game.togglePause());
+  document.getElementById('btn-again'  ).addEventListener('click', () => game.restart());
+  document.getElementById('btn-editor' ).addEventListener('click', () => editor.toggle());
+  document.getElementById('btn-clear'  ).addEventListener('click', () => {
+    if (confirm('Clear all custom sprites and revert to defaults?')) {
+      game.sprites.clearAll();
+      editor.rebuild();
+    }
+  });
+
+  // Responsive canvas scaling
+  function resize() {
+    const wrap = document.getElementById('game-wrap');
+    const maxW = Math.min(wrap.clientWidth, CW);
+    const maxH = window.innerHeight - 32;
+    const scale = Math.min(maxW / CW, maxH / CH);
+    game.canvas.style.width  = `${Math.round(CW * scale)}px`;
+    game.canvas.style.height = `${Math.round(CH * scale)}px`;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  game._updateUI();
+  game.start();
+});
+
+</script>
+</body>
+</html>
