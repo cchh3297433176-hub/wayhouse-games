@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2048</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background-color: #faf8ef;
+            font-family: Arial, sans-serif;
+        }
+        #game-root {
+            width: 100%;
+            padding: 16px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom:12px;
+        }
+        .title-area h1 {
+            font-size: 42px;
+            color:#776e65;
+        }
+        .score-box {
+            background:#bbada0;
+            color:white;
+            padding:8px 14px;
+            border-radius:6px;
+            text-align:center;
+        }
+        .score-label {
+            font-size:12px;
+            opacity:0.8;
+        }
+        .score-val {
+            font-size:22px;
+            font-weight:bold;
+        }
+        #restart-btn {
+            background:#8f7a66;
+            color:white;
+            border:none;
+            padding:10px 16px;
+            border-radius:6px;
+            font-size:16px;
+            margin-top:8px;
+        }
+        .canvas-wrap {
+            width:100%;
+            position:relative;
+        }
+        #gameCanvas {
+            width:100%;
+            height:auto;
+            border-radius:8px;
+            background:#bbada0;
+            touch-action:none;
+        }
+        .game-over-mask {
+            position:absolute;
+            inset:0;
+            background:rgba(238,228,218,0.7);
+            display:none;
+            flex-direction:column;
+            justify-content:center;
+            align-items:center;
+            border-radius:8px;
+        }
+        .game-over-mask.show {
+            display:flex;
+        }
+        .game-over-text {
+            font-size:32px;
+            color:#776e65;
+            font-weight:bold;
+            margin-bottom:16px;
+        }
+        .retry-btn {
+            background:#8f7a66;
+            color:white;
+            border:none;
+            padding:10px 20px;
+            border-radius:6px;
+            font-size:18px;
+        }
+    </style>
+</head>
+<body>
+<div id="game-root">
+    <div class="header">
+        <div class="title-area">
+            <h1>2048</h1>
+            <button id="restart-btn">重新开始</button>
+        </div>
+        <div class="score-box">
+            <div class="score-label">分数</div>
+            <div class="score-val" id="score-display">0</div>
+        </div>
+    </div>
+    <div class="canvas-wrap">
+        <canvas id="gameCanvas"></canvas>
+        <div class="game-over-mask" id="mask">
+            <div class="game-over-text" id="mask-text">游戏结束</div>
+            <button class="retry-btn" id="mask-btn">再来一局</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const scoreDisplay = document.getElementById("score-display");
+    const restartBtn = document.getElementById("restart-btn");
+    const mask = document.getElementById("mask");
+    const maskText = document.getElementById("mask-text");
+    const maskBtn = document.getElementById("mask-btn");
+
+    const GRID_SIZE = 4;
+    let board = [];
+    let score = 0;
+    let gameOver = false;
+    let winFlag = false;
+
+    // 颜色配置
+    const tileColors = {
+        0: {bg:"#cdc1b4", text:"#776e65"},
+        2: {bg:"#eee4da", text:"#776e65"},
+        4: {bg:"#ede0c8", text:"#776e65"},
+        8: {bg:"#f2b179", text:"#f9f6f2"},
+        16: {bg:"#f59563", text:"#f9f6f2"},
+        32: {bg:"#f67c5f", text:"#f9f6f2"},
+        64: {bg:"#f65e3b", text:"#f9f6f2"},
+        128: {bg:"#edcf72", text:"#f9f6f2"},
+        256: {bg:"#edcc61", text:"#f9f6f2"},
+        512: {bg:"#edc850", text:"#f9f6f2"},
+        1024: {bg:"#edc53f", text:"#f9f6f2"},
+        2048: {bg:"#edc22e", text:"#f9f6f2"},
+    };
+
+    let cellSize = 0;
+    let gap = 12;
+
+    // 初始化画布尺寸
+    function resizeCanvas(){
+        const wrap = canvas.parentElement;
+        const w = wrap.clientWidth;
+        canvas.width = w;
+        canvas.height = w;
+        cellSize = (canvas.width - gap * (GRID_SIZE+1)) / GRID_SIZE;
+        render();
+    }
+
+    // 初始化棋盘
+    function initBoard(){
+        board = Array(GRID_SIZE).fill(null).map(()=>Array(GRID_SIZE).fill(0));
+        score = 0;
+        gameOver = false;
+        winFlag = false;
+        mask.classList.remove("show");
+        addRandomTile();
+        addRandomTile();
+        updateScore();
+        render();
+    }
+
+    function addRandomTile(){
+        let empty = [];
+        for(let r=0;r<GRID_SIZE;r++){
+            for(let c=0;c<GRID_SIZE;c++){
+                if(board[r][c]===0) empty.push({r,c});
+            }
+        }
+        if(empty.length===0) return;
+        const pick = empty[Math.floor(Math.random()*empty.length)];
+        board[pick.r][pick.c] = Math.random()<0.9 ? 2 :4;
+    }
+
+    function updateScore(){
+        scoreDisplay.innerText = score.toString();
+    }
+
+    // 绘制
+    function render(){
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle="#bbada0";
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+
+        for(let r=0;r<GRID_SIZE;r++){
+            for(let c=0;c<GRID_SIZE;c++){
+                const val = board[r][c];
+                const x = gap + c*(cellSize+gap);
+                const y = gap + r*(cellSize+gap);
+                const colorCfg = tileColors[val] || {bg:"#3c3a32",text:"#fff"};
+                ctx.fillStyle = colorCfg.bg;
+                ctx.beginPath();
+                ctx.roundRect(x,y,cellSize,cellSize,6);
+                ctx.fill();
+                if(val>0){
+                    ctx.fillStyle = colorCfg.text;
+                    ctx.textAlign="center";
+                    ctx.textBaseline="middle";
+                    let fontSize = cellSize * 0.45;
+                    if(val>=1024) fontSize = cellSize * 0.32;
+                    ctx.font = `bold ${fontSize}px Arial`;
+                    ctx.fillText(val.toString(), x+cellSize/2, y+cellSize/2);
+                }
+            }
+        }
+    }
+
+    // 行移动逻辑
+    function slideRow(row){
+        let arr = row.filter(v=>v!==0);
+        let addScore = 0;
+        for(let i=0;i<arr.length-1;i++){
+            if(arr[i]===arr[i+1]){
+                arr[i] *=2;
+                addScore += arr[i];
+                arr.splice(i+1,1);
+            }
+        }
+        while(arr.length < GRID_SIZE) arr.push(0);
+        return {row:arr, addScore};
+    }
+
+    function moveLeft(){
+        let changed = false;
+        for(let r=0;r<GRID_SIZE;r++){
+            const res = slideRow(board[r]);
+            if(JSON.stringify(board[r]) !== JSON.stringify(res.row)) changed=true;
+            board[r] = res.row;
+            score += res.addScore;
+        }
+        return changed;
+    }
+    function moveRight(){
+        let changed = false;
+        for(let r=0;r<GRID_SIZE;r++){
+            let rev = [...board[r]].reverse();
+            const res = slideRow(rev);
+            let newRow = res.row.reverse();
+            if(JSON.stringify(board[r]) !== JSON.stringify(newRow)) changed=true;
+            board[r] = newRow;
+            score += res.addScore;
+        }
+        return changed;
+    }
+    function transpose(mat){
+        let res = Array(GRID_SIZE).fill(null).map(()=>Array(GRID_SIZE).fill(0));
+        for(let r=0;r<GRID_SIZE;r++){
+            for(let c=0;c<GRID_SIZE;c++){
+                res[r][c] = mat[c][r];
+            }
+        }
+        return res;
+    }
+    function moveUp(){
+        let changed = false;
+        let t = transpose(board);
+        for(let r=0;r<GRID_SIZE;r++){
+            const res = slideRow(t[r]);
+            if(JSON.stringify(t[r]) !== JSON.stringify(res.row)) changed=true;
+            t[r] = res.row;
+        }
+        board = transpose(t);
+        return changed;
+    }
+    function moveDown(){
+        let changed = false;
+        let t = transpose(board);
+        for(let r=0;r<GRID_SIZE;r++){
+            let rev = [...t[r]].reverse();
+            const res = slideRow(rev);
+            let newRow = res.row.reverse();
+            if(JSON.stringify(t[r]) !== JSON.stringify(newRow)) changed=true;
+            t[r] = newRow;
+            score += res.addScore;
+        }
+        board = transpose(t);
+        return changed;
+    }
+
+    function canMove(){
+        // 有空格子
+        for(let r=0;r<GRID_SIZE;r++){
+            for(let c=0;c<GRID_SIZE;c++){
+                if(board[r][c]===0) return true;
+            }
+        }
+        // 相邻可合并
+        for(let r=0;r<GRID_SIZE;r++){
+            for(let c=0;c<GRID_SIZE;c++){
+                if(c+1<GRID_SIZE && board[r][c]===board[r][c+1]) return true;
+                if(r+1<GRID_SIZE && board[r][c]===board[r+1][c]) return true;
+            }
+        }
+        return false;
+    }
+
+    function checkWin(){
+        for(let r=0;r<GRID_SIZE;r++){
+            for(let c=0;c<GRID_SIZE;c++){
+                if(board[r][c]===2048) return true;
+            }
+        }
+        return false;
+    }
+
+    function doMove(dir){
+        if(gameOver) return;
+        let changed = false;
+        switch(dir){
+            case "left": changed = moveLeft(); break;
+            case "right": changed = moveRight(); break;
+            case "up": changed = moveUp(); break;
+            case "down": changed = moveDown(); break;
+        }
+        if(changed){
+            addRandomTile();
+            updateScore();
+            render();
+            if(!winFlag && checkWin()){
+                winFlag = true;
+                maskText.innerText = "🎉 达到2048！";
+                mask.classList.add("show");
+            }else if(!canMove()){
+                gameOver = true;
+                maskText.innerText = "游戏结束";
+                mask.classList.add("show");
+            }
+        }
+    }
+
+    // 键盘
+    document.addEventListener("keydown",e=>{
+        switch(e.key){
+            case "ArrowLeft": doMove("left"); break;
+            case "ArrowRight": doMove("right"); break;
+            case "ArrowUp": doMove("up"); break;
+            case "ArrowDown": doMove("down"); break;
+        }
+    });
+
+    // 触屏滑动
+    let touchStartX=0,touchStartY=0;
+    canvas.addEventListener("touchstart",e=>{
+        e.preventDefault();
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+    },{passive:false});
+
+    canvas.addEventListener("touchend",e=>{
+        e.preventDefault();
+        const endX = e.changedTouches[0].clientX;
+        const endY = e.changedTouches[0].clientY;
+        const dx = endX - touchStartX;
+        const dy = endY - touchStartY;
+        const threshold = 30;
+        if(Math.abs(dx) > Math.abs(dy)){
+            if(dx>threshold) doMove("right");
+            else if(dx < -threshold) doMove("left");
+        }else{
+            if(dy>threshold) doMove("down");
+            else if(dy < -threshold) doMove("up");
+        }
+    },{passive:false});
+
+    // 鼠标拖拽简易支持
+    let mouseDown = false;
+    let mStartX=0,mStartY=0;
+    canvas.addEventListener("mousedown",e=>{
+        mouseDown=true;
+        mStartX = e.clientX;
+        mStartY = e.clientY;
+    });
+    canvas.addEventListener("mouseup",e=>{
+        if(!mouseDown) return;
+        mouseDown=false;
+        const dx = e.clientX - mStartX;
+        const dy = e.clientY - mStartY;
+        const threshold =30;
+        if(Math.abs(dx) > Math.abs(dy)){
+            if(dx>threshold) doMove("right");
+            else if(dx < -threshold) doMove("left");
+        }else{
+            if(dy>threshold) doMove("down");
+            else if(dy < -threshold) doMove("up");
+        }
+    });
+
+    restartBtn.onclick = initBoard;
+    maskBtn.onclick = initBoard;
+
+    window.addEventListener("resize", resizeCanvas);
+
+    // 动画循环
+    function loop(){
+        requestAnimationFrame(loop);
+    }
+    loop();
+
+    resizeCanvas();
+    initBoard();
+})();
+</script>
+</body>
+</html>
