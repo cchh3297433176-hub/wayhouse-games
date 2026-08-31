@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>羊了个羊</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <h1>羊了个羊 (第<span id="level">1</span>关)</h1>
+            <div class="controls">
+                <button onclick="resetGame()">重置</button>
+                <button onclick="toggleHelp()">帮助</button>
+            </div>
+        </div>
+        <div id="game-board"></div>
+        <div id="slot-area"></div>
+    </div>
+
+    <div id="help-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="toggleHelp()">&times;</span>
+            <h2>游戏规则</h2>
+            <p>1. 点击未被覆盖的卡牌移动到下方卡槽</p>
+            <p>2. 集齐3个相同卡牌即可消除</p>
+            <p>3. 卡槽最多存放7张卡牌</p>
+            <p>4. 消除所有卡牌即可过关！</p>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>
